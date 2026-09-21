@@ -64,3 +64,7 @@ without running them through Jekyll first.
 
 Built for the fun of it. Munch, Pip, Zest, Fig, and Peel are original
 characters — no relation to anyone else's arcade cabinet.
+
+## License
+
+Apache License 2.0 — see `LICENSE`.
