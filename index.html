@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>Munch</title>
+<meta name="description" content="Munch — a hungry little blob loose in the pantry at midnight. Eat every crumb, dodge the Rinds, and don't stop chewing.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #150E22;
+    --panel: #1C1330;
+    --panel-edge: #35275A;
+    --wall: #4A3B78;
+    --wall-lo: #382C5C;
+    --wall-hi: #8B7BD8;
+    --dot: #F4E9D8;
+    --pellet: #FF6F59;
+    --munch: #FFC53D;
+    --munch-lo: #C98A18;
+    --pip: #FF6F91;
+    --zest: #4FD8C4;
+    --fig: #B98CF5;
+    --peel: #9BD46B;
+    --frightened: #E7E4F4;
+    --text: #F4E9D8;
+    --text-dim: #B4A8D6;
+    --good: #9BD46B;
+  }
+  *{ box-sizing: border-box; }
+  html,body{
+    height:100%;
+    margin:0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+  body{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    min-height:100%;
+    padding: env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);
+    padding-top: calc(env(safe-area-inset-top,0px) + 14px);
+    padding-bottom: calc(env(safe-area-inset-bottom,0px) + 14px);
+    touch-action: none;
+    user-select: none;
+  }
+  .pixel{ font-family:'Press Start 2P', monospace; letter-spacing: 0.5px; }
+
+  .stage{
+    width: 100%;
+    max-width: 460px;
+    padding: 0 12px;
+    display:flex;
+    flex-direction:column;
+    gap: 10px;
+  }
+
+  /* ---------- header / HUD ---------- */
+  .hud{
+    display:flex;
+    align-items:flex-end;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .wordmark{
+    color: var(--munch);
+    font-size: 20px;
+    line-height:1;
+    text-shadow: 0 0 12px rgba(255,197,61,0.45);
+  }
+  .hud-stats{
+    display:flex;
+    align-items:center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .stat{ text-align:right; }
+  .stat .label{ font-size: 10px; color: var(--text-dim); margin-bottom: 3px; }
+  .stat .value{ font-size: 14px; color: var(--text); }
+  .lives{ display:flex; gap:5px; align-items:center; }
+  .life-dot{
+    width:14px; height:14px; border-radius:50%;
+    background: radial-gradient(circle at 35% 30%, #FFE49A, var(--munch) 60%, var(--munch-lo));
+  }
+
+  /* ---------- canvas / stage frame ---------- */
+  .frame{
+    position: relative;
+    border-radius: 14px;
+    background: var(--panel);
+    border: 2px solid var(--panel-edge);
+    box-shadow: inset 0 0 0 1px rgba(139,123,216,0.08), 0 18px 40px -20px rgba(0,0,0,0.7);
+    padding: 8px;
+    overflow: hidden;
+  }
+  canvas{
+    display:block;
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+    background: var(--bg);
+  }
+  .overlay{
+    position:absolute;
+    inset: 8px;
+    border-radius: 8px;
+    background: rgba(10,7,18,0.86);
+    backdrop-filter: blur(2px);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    padding: 20px 18px;
+    gap: 10px;
+    transition: opacity 0.15s ease;
+  }
+  .overlay.hidden{ display:none; }
+  .overlay h1{
+    margin:0;
+    color: var(--munch);
+    font-size: 26px;
+    text-shadow: 0 0 16px rgba(255,197,61,0.5);
+  }
+  .overlay h2{
+    margin:0;
+    color: var(--text);
+    font-size: 16px;
+  }
+  .overlay p{
+    margin:0;
+    color: var(--text-dim);
+    font-size: 13px;
+    max-width: 320px;
+    line-height:1.5;
+  }
+  .overlay .score-line{ color: var(--text); font-size: 14px; }
+  .overlay .score-line b{ color: var(--munch); }
+
+  .roster{
+    display:flex;
+    gap: 12px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+    justify-content:center;
+  }
+  .roster .who{ display:flex; flex-direction:column; align-items:center; gap:3px; width: 62px; }
+  .roster .swatch{ width: 20px; height:16px; border-radius: 10px 10px 4px 4px; margin-bottom: 1px; }
+  .roster .who span{ font-size: 10px; color: var(--text-dim); line-height:1.3; }
+  .roster .who-name{ color: var(--text); font-weight: 600; }
+
+  .btn{
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+    font-size: 14px;
+    color: #1B1230;
+    background: var(--munch);
+    border: none;
+    border-radius: 999px;
+    padding: 11px 26px;
+    cursor: pointer;
+    box-shadow: 0 6px 0 var(--munch-lo);
+    transform: translateY(0);
+    transition: transform 0.08s ease, box-shadow 0.08s ease;
+  }
+  .btn:active{ transform: translateY(4px); box-shadow: 0 2px 0 var(--munch-lo); }
+  .btn.ghost{
+    background: transparent;
+    color: var(--text);
+    box-shadow: none;
+    border: 1.5px solid var(--panel-edge);
+    padding: 9px 22px;
+  }
+  .btn.ghost:active{ transform: translateY(2px); }
+
+  /* ---------- controls row ---------- */
+  .controls{
+    display:flex;
+    align-items:center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .controls .hint{
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.4;
+  }
+  .icon-btn{
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    border: 1.5px solid var(--panel-edge);
+    background: var(--panel);
+    color: var(--text);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    flex: 0 0 auto;
+  }
+  .icon-btn svg{ width: 18px; height: 18px; }
+  .icon-group{ display:flex; gap: 8px; }
+
+  /* ---------- on-screen d-pad (touch only) ---------- */
+  .dpad{ display:none; }
+  @media (pointer: coarse){
+    .dpad{
+      display:grid;
+      grid-template-columns: 52px 52px 52px;
+      grid-template-rows: 52px 52px 52px;
+      gap: 6px;
+      justify-content:center;
+      margin-top: 2px;
+    }
+    .dpad button{
+      border-radius: 12px;
+      border: 1.5px solid var(--panel-edge);
+      background: var(--panel);
+      color: var(--munch);
+      font-size: 16px;
+      display:flex; align-items:center; justify-content:center;
+      touch-action: none;
+    }
+    .dpad button:active{ background: #241A3C; }
+    .dpad .up{ grid-column:2; grid-row:1; }
+    .dpad .left{ grid-column:1; grid-row:2; }
+    .dpad .right{ grid-column:3; grid-row:2; }
+    .dpad .down{ grid-column:2; grid-row:3; }
+    .dpad .mid{ grid-column:2; grid-row:2; visibility:hidden; }
+  }
+
+  footer{
+    color: var(--text-dim);
+    font-size: 11px;
+    text-align:center;
+    margin-top: 4px;
+  }
+  footer a{ color: var(--text-dim); }
+
+  @media (prefers-reduced-motion: reduce){
+    .btn, .icon-btn, .dpad button{ transition:none; }
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <div class="hud">
+    <div class="wordmark pixel">Munch</div>
+    <div class="hud-stats">
+      <div class="stat">
+        <div class="label">Score</div>
+        <div class="value pixel" id="hudScore">0</div>
+      </div>
+      <div class="stat">
+        <div class="label">Best</div>
+        <div class="value pixel" id="hudBest">0</div>
+      </div>
+      <div class="stat">
+        <div class="label">Level</div>
+        <div class="value pixel" id="hudLevel">1</div>
+      </div>
+      <div class="lives" id="hudLives" aria-label="Lives remaining"></div>
+    </div>
+  </div>
+
+  <div class="frame">
+    <canvas id="game" width="420" height="460"></canvas>
+
+    <div class="overlay" id="titleOverlay">
+      <h1 class="pixel">Munch</h1>
+      <p>A hungry little blob is loose in the pantry at midnight. Eat every crumb, grab the sour drops, and don't let the Rinds catch up to you.</p>
+      <button class="btn" id="startBtn">Play</button>
+      <div class="roster">
+        <div class="who"><div class="swatch" style="background:var(--pip)"></div><span class="who-name">Pip</span><span>reckless</span></div>
+        <div class="who"><div class="swatch" style="background:var(--zest)"></div><span class="who-name">Zest</span><span>cunning</span></div>
+        <div class="who"><div class="swatch" style="background:var(--fig)"></div><span class="who-name">Fig</span><span>sneaky</span></div>
+        <div class="who"><div class="swatch" style="background:var(--peel)"></div><span class="who-name">Peel</span><span>shy</span></div>
+      </div>
+    </div>
+
+    <div class="overlay hidden" id="pauseOverlay">
+      <h2 class="pixel">Paused</h2>
+      <button class="btn" id="resumeBtn">Resume</button>
+    </div>
+
+    <div class="overlay hidden" id="gameOverOverlay">
+      <h2 class="pixel">Game over</h2>
+      <p class="score-line">Score <b id="finalScore">0</b></p>
+      <p class="score-line" id="newBestLine" style="display:none; color:var(--good);">New best score!</p>
+      <button class="btn" id="retryBtn">Play again</button>
+    </div>
+
+  </div>
+
+  <div class="controls">
+    <p class="hint">Move with arrow keys, WASD, or swipe the maze. Press P to pause.</p>
+    <div class="icon-group">
+      <button class="icon-btn" id="muteBtn" aria-label="Mute sound" title="Mute sound"></button>
+      <button class="icon-btn" id="pauseBtn" aria-label="Pause" title="Pause"></button>
+    </div>
+  </div>
+
+  <div class="dpad" aria-hidden="true">
+    <button class="up" data-dir="up">▲</button>
+    <button class="left" data-dir="left">◀</button>
+    <button class="mid"></button>
+    <button class="right" data-dir="right">▶</button>
+    <button class="down" data-dir="down">▼</button>
+  </div>
+
+  <footer>Munch — an original maze-chase built for the fun of it.</footer>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/* =====================================================================
+   MAZE DATA
+   21 columns x 23 rows. Generated + validated offline (recursive-
+   backtracker with loops added, mirrored left/right for symmetry) so
+   every open tile is reachable from every other open tile.
+   Legend: # wall · . crumb · o sour drop · _ open floor (no crumb)
+           space = pantry-box interior (Rinds only) · G pantry-box gate (Rinds only)
+   ===================================================================== */
+var MAZE_RAW = [
+  '#####################',
+  '#o....#...#...#....o#',
+  '#####.#.#.#.#.#.#####',
+  '#.......#.#.#.......#',
+  '#.#.###.#.#.#.###.#.#',
+  '#.#...#.#.#.#.#...#.#',
+  '#.#.#.#.#.#.#.#.#.#.#',
+  '#...#...#.#.#...#...#',
+  '#.#.#####.#.#####.#.#',
+  '#.#... ##G#G## ...#.#',
+  '#.#### #     # ####.#',
+  '..#... #     # ...#..',
+  '#.#.#. #     # .#.#.#',
+  '#.#.#. ####### .#.#.#',
+  '#.#.#####.#.#####.#.#',
+  '#.........#.........#',
+  '#.###.#########.###.#',
+  '#...#.#...#...#.#...#',
+  '###.#.#.#.#.#.#.#.###',
+  '#.....#._____.#.....#',
+  '#.###.#._____.#.###.#',
+  '#o......#.#.#......o#',
+  '#####################'
+];
+var COLS = MAZE_RAW[0].length;   // 21
+var ROWS = MAZE_RAW.length;      // 23
+var TUNNEL_ROW = 11;
+
+var grid, dotsRemaining, totalDots;
+
+function resetGrid(){
+  grid = MAZE_RAW.map(function(r){ return r.split(''); });
+  var n = 0;
+  for (var y=0;y<ROWS;y++) for (var x=0;x<COLS;x++){
+    var c = grid[y][x];
+    if (c === '.' || c === 'o') n++;
+  }
+  totalDots = n;
+  dotsRemaining = n;
+}
+
+function wrapCol(c){
+  if (c < 0) return c + COLS;
+  if (c >= COLS) return c - COLS;
+  return c;
+}
+
+function tileAt(col, row){
+  if (row < 0 || row >= ROWS) return '#';
+  var c = wrapCol(col);
+  return grid[row][c];
+}
+
+// allowHouse: can this mover use the pantry-box interior / gate tiles?
+function walkable(col, row, allowHouse){
+  var t = tileAt(col, row);
+  if (t === '#') return false;
+  if ((t === ' ' || t === 'G') && !allowHouse) return false;
+  return true;
+}
+
+/* =====================================================================
+   AUDIO — tiny synthesized blips via Web Audio, no assets.
+   ===================================================================== */
+var Audio_ = (function(){
+  var ctx = null, muted = false;
+  try { muted = localStorage.getItem('munch-muted') === '1'; } catch(e){}
+
+  function ensure(){
+    if (!ctx){
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) ctx = new AC();
+    }
+    if (ctx && ctx.state === 'suspended') ctx.resume();
+    return ctx;
+  }
+  function tone(freq, dur, type, vol, glideTo, delay){
+    if (muted) return;
+    var c = ensure();
+    if (!c) return;
+    var t0 = c.currentTime + (delay||0);
+    var osc = c.createOscillator();
+    var gain = c.createGain();
+    osc.type = type || 'square';
+    osc.frequency.setValueAtTime(freq, t0);
+    if (glideTo) osc.frequency.linearRampToValueAtTime(glideTo, t0 + dur);
+    gain.gain.setValueAtTime((vol==null?0.06:vol), t0);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(gain); gain.connect(c.destination);
+    osc.start(t0); osc.stop(t0 + dur + 0.02);
+  }
+  return {
+    unlock: ensure,
+    crumb: function(alt){ tone(alt?520:440, 0.045, 'square', 0.05); },
+    pellet: function(){ tone(220, 0.22, 'sawtooth', 0.06, 440); },
+    eatRind: function(combo){ tone(180 + combo*90, 0.18, 'square', 0.07, 60); },
+    death: function(){ tone(300, 0.5, 'sawtooth', 0.08, 60); },
+    levelClear: function(){
+      [523,659,784,1047].forEach(function(f,i){ tone(f, 0.14, 'triangle', 0.07, null, i*0.12); });
+    },
+    isMuted: function(){ return muted; },
+    setMuted: function(v){ muted = v; try{ localStorage.setItem('munch-muted', v?'1':'0'); }catch(e){} }
+  };
+})();
+
+/* =====================================================================
+   ENTITIES
+   ===================================================================== */
+var DIRS = {
+  up:    {dx:0, dy:-1},
+  down:  {dx:0, dy:1},
+  left:  {dx:-1, dy:0},
+  right: {dx:1, dy:0},
+  none:  {dx:0, dy:0}
+};
+function opposite(d){
+  if (d.dx===1) return DIRS.left;
+  if (d.dx===-1) return DIRS.right;
+  if (d.dy===1) return DIRS.up;
+  if (d.dy===-1) return DIRS.down;
+  return DIRS.none;
+}
+function sameDir(a,b){ return a.dx===b.dx && a.dy===b.dy; }
+
+var START = { col: 10, row: 20 };
+var CORNERS = {
+  tl: {col:1, row:1}, tr: {col:19, row:1},
+  bl: {col:1, row:21}, br: {col:19, row:21}
+};
+var GATE_L = {col:9, row:8};
+var GATE_R = {col:11, row:8};
+var HOUSE_REST = {col:10, row:11};
+
+function makePlayer(){
+  return {
+    col: START.col, row: START.row,
+    dir: DIRS.left, nextDir: DIRS.left,
+    speed: 6.2,
+    mouthPhase: 0,
+    alive: true
+  };
+}
+
+function makeRinds(){
+  return [
+    { name:'Pip',  color:'var(--pip)',  hex:'#FF6F91', personality:'reckless',
+      col:9, row:11, dir: DIRS.up, home: CORNERS.tr, gateOut: GATE_L, releaseAt: 0 },
+    { name:'Zest', color:'var(--zest)', hex:'#4FD8C4', personality:'cunning',
+      col:11, row:11, dir: DIRS.up, home: CORNERS.tl, gateOut: GATE_R, releaseAt: 3.5 },
+    { name:'Fig',  color:'var(--fig)',  hex:'#B98CF5', personality:'sneaky',
+      col:9, row:12, dir: DIRS.up, home: CORNERS.br, gateOut: GATE_L, releaseAt: 7.5 },
+    { name:'Peel', color:'var(--peel)', hex:'#9BD46B', personality:'shy',
+      col:11, row:12, dir: DIRS.up, home: CORNERS.bl, gateOut: GATE_R, releaseAt: 12 }
+  ].map(function(r){
+    r.startCol = r.col; r.startRow = r.row; r.startReleaseAt = r.releaseAt;
+    r.state = 'inHouse'; // inHouse -> exiting -> normal ; or frightened / eaten at any time after normal
+    r.speed = 5.2;
+    r.frightTimer = 0;
+    r.stateTimer = 0;
+    return r;
+  });
+}
+
+/* =====================================================================
+   GAME STATE
+   ===================================================================== */
+var TILE = 20;
+var canvas = document.getElementById('game');
+var ctx = canvas.getContext('2d');
+var bgCanvas = document.createElement('canvas');
+var bgCtx = bgCanvas.getContext('2d');
+var DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+function fitCanvas(){
+  canvas.width = COLS * TILE * DPR;
+  canvas.height = ROWS * TILE * DPR;
+  bgCanvas.width = canvas.width;
+  bgCanvas.height = canvas.height;
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  bgCtx.setTransform(DPR,0,0,DPR,0,0);
+}
+fitCanvas();
+
+var state = 'title'; // title, ready, playing, paused, dying, levelclear, gameover
+var stateTimer = 0;
+var level = 1;
+var score = 0;
+var best = 0;
+try { best = parseInt(localStorage.getItem('munch-best') || '0', 10) || 0; } catch(e){}
+var lives = 3;
+var player = makePlayer();
+var rinds = makeRinds();
+var globalMode = 'scatter';
+var modeIndex = 0;
+var modeTimer = 0;
+var comboMultiplier = 0;
+var frightGlobalActive = false;
+var bonus = { active:false, col:10, row:15, timer:0 };
+var elapsedPlaying = 0; // time since current life/level started playing (drives rind releases)
+
+function modeSequence(lvl){
+  // seconds, alternating scatter/chase, shrinking scatter time on later levels
+  var scatter = Math.max(3, 7 - Math.floor(lvl/2));
+  var chase = Math.min(28, 16 + lvl*2);
+  return [scatter, chase, scatter, chase, Math.max(3,scatter-2), chase, 2, 99999];
+}
+var curModeSeq = modeSequence(level);
+
+function frightDuration(lvl){ return Math.max(2, 8 - lvl*0.6); }
+
+function speeds(lvl){
+  var bump = Math.min(lvl-1, 8) * 0.09;
+  return {
+    player: 6.2 + bump,
+    chase: 5.2 + bump*0.85,
+    fright: 3.2,
+    eaten: 9.5,
+    exit: 4.0
+  };
+}
+
+/* =====================================================================
+   RESET / LIFECYCLE
+   ===================================================================== */
+function hardResetForNewGame(){
+  level = 1; score = 0; lives = 3; comboMultiplier = 0;
+  curModeSeq = modeSequence(level);
+  softResetForLevel(true);
+}
+function softResetForLevel(freshDots){
+  if (freshDots) resetGrid();
+  player = makePlayer();
+  var sp = speeds(level);
+  player.speed = sp.player;
+  rinds = makeRinds();
+  rinds.forEach(function(r){ r.speed = sp.chase; });
+  globalMode = 'scatter'; modeIndex = 0; modeTimer = 0;
+  curModeSeq = modeSequence(level);
+  frightGlobalActive = false;
+  bonus.active = false; bonus.timer = 0;
+  elapsedPlaying = 0;
+  drawBackground();
+}
+function resetAfterDeath(){
+  player.col = START.col; player.row = START.row;
+  player.dir = DIRS.left; player.nextDir = DIRS.left;
+  rinds.forEach(function(r){
+    r.col = r.startCol; r.row = r.startRow; r.dir = DIRS.up;
+    r.state = 'inHouse'; r.releaseAt = r.startReleaseAt * 0.6;
+    r.frightTimer = 0;
+  });
+  globalMode = 'scatter'; modeIndex = 0; modeTimer = 0;
+  frightGlobalActive = false; comboMultiplier = 0;
+  elapsedPlaying = 0;
+}
+
+/* =====================================================================
+   INPUT
+   ===================================================================== */
+var KEY_DIR = {
+  ArrowUp:'up', ArrowDown:'down', ArrowLeft:'left', ArrowRight:'right',
+  w:'up', s:'down', a:'left', d:'right', W:'up', S:'down', A:'left', D:'right'
+};
+window.addEventListener('keydown', function(e){
+  if (KEY_DIR[e.key]){
+    Audio_.unlock();
+    player.nextDir = DIRS[KEY_DIR[e.key]];
+    if (state === 'title') startGame();
+    e.preventDefault();
+  } else if (e.key === 'p' || e.key === 'P' || e.key === 'Escape'){
+    togglePause();
+  } else if (e.key === ' '){
+    if (state === 'title') startGame();
+    else if (state === 'gameover') startGame();
+    e.preventDefault();
+  }
+}, {passive:false});
+
+var touchStart = null;
+canvas.addEventListener('touchstart', function(e){
+  var t = e.changedTouches[0];
+  touchStart = {x:t.clientX, y:t.clientY};
+}, {passive:true});
+canvas.addEventListener('touchmove', function(e){
+  if (!touchStart) return;
+  var t = e.changedTouches[0];
+  var dx = t.clientX - touchStart.x, dy = t.clientY - touchStart.y;
+  if (Math.abs(dx) < 18 && Math.abs(dy) < 18) return;
+  Audio_.unlock();
+  if (Math.abs(dx) > Math.abs(dy)) player.nextDir = dx > 0 ? DIRS.right : DIRS.left;
+  else player.nextDir = dy > 0 ? DIRS.down : DIRS.up;
+  touchStart = {x:t.clientX, y:t.clientY};
+}, {passive:true});
+canvas.addEventListener('touchend', function(){ touchStart = null; });
+canvas.addEventListener('click', function(){ if (state === 'title') startGame(); });
+
+document.querySelectorAll('.dpad button[data-dir]').forEach(function(btn){
+  btn.addEventListener('pointerdown', function(e){
+    e.preventDefault();
+    Audio_.unlock();
+    player.nextDir = DIRS[btn.getAttribute('data-dir')];
+    if (state === 'title') startGame();
+  });
+});
+
+document.getElementById('startBtn').addEventListener('click', function(){ Audio_.unlock(); startGame(); });
+document.getElementById('retryBtn').addEventListener('click', function(){ Audio_.unlock(); startGame(); });
+document.getElementById('resumeBtn').addEventListener('click', togglePause);
+document.getElementById('pauseBtn').addEventListener('click', togglePause);
+document.getElementById('muteBtn').addEventListener('click', function(){
+  Audio_.setMuted(!Audio_.isMuted());
+  renderMuteIcon();
+});
+
+function togglePause(){
+  if (state === 'playing'){ state = 'paused'; show('pauseOverlay'); }
+  else if (state === 'paused'){ state = 'playing'; hide('pauseOverlay'); }
+}
+function show(id){ document.getElementById(id).classList.remove('hidden'); }
+function hide(id){ document.getElementById(id).classList.add('hidden'); }
+
+function startGame(){
+  hide('titleOverlay'); hide('gameOverOverlay'); hide('pauseOverlay');
+  hardResetForNewGame();
+  state = 'ready'; stateTimer = 1.1;
+  updateHud();
+}
+
+/* =====================================================================
+   AI TARGETING
+   ===================================================================== */
+function playerTile(){ return { col: Math.round(player.col), row: Math.round(player.row) }; }
+
+function personalityTarget(r){
+  var pt = playerTile();
+  switch (r.personality){
+    case 'reckless': return pt;
+    case 'cunning': {
+      var ahead = { col: pt.col + player.dir.dx*4, row: pt.row + player.dir.dy*4 };
+      return ahead;
+    }
+    case 'sneaky': {
+      var pip = rinds[0];
+      return { col: Math.round((pt.col + pip.col)/2), row: Math.round((pt.row + pip.row)/2) };
+    }
+    case 'shy': {
+      var d = dist2({col:r.col,row:r.row}, pt);
+      if (d > 64) return pt;
+      return r.home;
+    }
+    default: return pt;
+  }
+}
+function dist2(a,b){ var dx=a.col-b.col, dy=a.row-b.row; return dx*dx+dy*dy; }
+
+function targetFor(r){
+  if (r.state === 'eaten') return HOUSE_REST;
+  if (r.state === 'exiting') return r.gateOut;
+  if (r.state === 'frightened') return null; // random
+  if (r.state === 'scatter') return r.home;
+  if (r.state === 'chase') return personalityTarget(r);
+  return r.home;
+}
+
+function chooseRindDir(r){
+  var col = Math.round(r.col), row = Math.round(r.row);
+  var allowHouse = (r.state === 'eaten' || r.state === 'exiting' || r.state === 'inHouse');
+  var keys = ['up','down','left','right'];
+  var options = [];
+  for (var i=0;i<keys.length;i++){
+    var d = DIRS[keys[i]];
+    if (walkable(col + d.dx, row + d.dy, allowHouse)) options.push(d);
+  }
+  if (options.length === 0) return r.dir;
+  var nonReverse = options.filter(function(d){ return !sameDir(d, opposite(r.dir)); });
+  var pool = nonReverse.length ? nonReverse : options;
+
+  if (r.state === 'frightened'){
+    return pool[Math.floor(Math.random()*pool.length)];
+  }
+  var target = targetFor(r);
+  if (!target) return pool[Math.floor(Math.random()*pool.length)];
+  var best_ = pool[0], bestD = Infinity;
+  for (var j=0;j<pool.length;j++){
+    var d2 = pool[j];
+    var nc = col + d2.dx, nr = row + d2.dy;
+    var dd = dist2({col:nc,row:nr}, target);
+    if (dd < bestD){ bestD = dd; best_ = d2; }
+  }
+  return best_;
+}
+
+/* =====================================================================
+   UPDATE
+   ===================================================================== */
+// Entities move in fixed tile-per-second speeds but the frame loop takes
+// discrete dt steps. At higher speeds a single frame's movement can be a
+// large fraction of a tile, so a plain "are we near an integer?" epsilon
+// check can be stepped clean over — the entity would sail through a tile
+// centre (where the only wall check happens) without ever registering it,
+// and could coast straight into a wall. advanceOnGrid() instead walks an
+// entity boundary-by-boundary: it always stops exactly on the next tile
+// centre, lets the caller re-decide direction there, and only then spends
+// the remaining time in the (possibly new) direction — repeating within
+// the same frame if the entity is fast enough to cross more than one tile.
+function atInt(v){ return Math.abs(v - Math.round(v)) < 1e-6; }
+
+function advanceOnGrid(e, dt, getSpeed, onArrive){
+  if (atInt(e.col) && atInt(e.row)){
+    e.col = Math.round(e.col); e.row = Math.round(e.row);
+    onArrive(e);
+  }
+  var remaining = dt, guard = 0;
+  while (remaining > 1e-7 && guard++ < 8){
+    if (e.dir.dx === 0 && e.dir.dy === 0) break;
+    var horiz = e.dir.dx !== 0;
+    var pos = horiz ? e.col : e.row;
+    var dv = horiz ? e.dir.dx : e.dir.dy;
+    var boundary = dv > 0 ? Math.floor(pos + 1e-9) + 1 : Math.ceil(pos - 1e-9) - 1;
+    var distTiles = Math.abs(boundary - pos);
+    var speed = getSpeed(e);
+    var moveTiles = speed * remaining;
+    if (moveTiles >= distTiles - 1e-7){
+      var dtUsed = speed > 0 ? distTiles / speed : remaining;
+      if (horiz) e.col = boundary; else e.row = boundary;
+      remaining -= dtUsed;
+      if (Math.round(e.row) === TUNNEL_ROW){
+        if (e.col < 0) e.col += COLS;
+        if (e.col >= COLS) e.col -= COLS;
+      }
+      e.col = Math.round(e.col*1e6)/1e6; e.row = Math.round(e.row*1e6)/1e6;
+      onArrive(e);
+    } else {
+      if (horiz) e.col += dv * moveTiles; else e.row += dv * moveTiles;
+      remaining = 0;
+    }
+  }
+}
+
+function decidePlayerAtTile(){
+  var col = Math.round(player.col), row = Math.round(player.row);
+  if (!sameDir(player.nextDir, player.dir) && walkable(col + player.nextDir.dx, row + player.nextDir.dy, false)){
+    player.dir = player.nextDir;
+  } else if (!walkable(col + player.dir.dx, row + player.dir.dy, false)){
+    player.dir = DIRS.none;
+  }
+  eatAt(col, row);
+}
+
+function eatAt(col, row){
+  var t = tileAt(col, row);
+  if (t === '.' || t === 'o'){
+    grid[row][wrapCol(col)] = '_';
+    dotsRemaining--;
+    if (t === '.'){ score += 10; Audio_.crumb(Math.random()<0.5); }
+    else { score += 50; Audio_.pellet(); triggerFright(); }
+    updateHud();
+  }
+  if (bonus.active && col === bonus.col && row === bonus.row){
+    bonus.active = false; score += 100; Audio_.eatRind(0); updateHud();
+  }
+}
+
+function updatePlayer(dt){
+  advanceOnGrid(player, dt, function(){ return player.speed; }, decidePlayerAtTile);
+  player.mouthPhase += dt * (player.dir === DIRS.none ? 0 : 10);
+}
+
+function triggerFright(){
+  frightGlobalActive = true;
+  comboMultiplier = 0;
+  var d = frightDuration(level);
+  rinds.forEach(function(r){
+    if (r.state === 'chase' || r.state === 'scatter'){
+      r.state = 'frightened';
+      r.frightTimer = d;
+      r.dir = opposite(r.dir);
+    } else if (r.state === 'frightened'){
+      r.frightTimer = d;
+    }
+  });
+}
+
+function updateGlobalMode(dt){
+  if (frightGlobalActive){
+    var anyFright = rinds.some(function(r){ return r.state === 'frightened'; });
+    if (!anyFright) frightGlobalActive = false;
+    return;
+  }
+  modeTimer += dt;
+  var dur = curModeSeq[modeIndex];
+  if (modeTimer >= dur && modeIndex < curModeSeq.length - 1){
+    modeTimer = 0;
+    modeIndex++;
+    globalMode = (modeIndex % 2 === 0) ? 'scatter' : 'chase';
+    rinds.forEach(function(r){
+      if (r.state === 'scatter' || r.state === 'chase'){
+        r.state = globalMode;
+        r.dir = opposite(r.dir);
+      }
+    });
+  }
+}
+
+function rindSpeed(r){
+  var sp = speeds(level);
+  if (r.state === 'frightened') return sp.fright;
+  if (r.state === 'eaten') return sp.eaten;
+  if (r.state === 'exiting') return sp.exit;
+  return sp.chase;
+}
+
+function updateRind(r, dt){
+  if (r.state === 'inHouse'){
+    if (elapsedPlaying >= r.releaseAt) r.state = 'exiting';
+    else return; // holds position exactly; a purely visual bob is added at render time
+  }
+  if (r.state === 'frightened'){
+    r.frightTimer -= dt;
+    if (r.frightTimer <= 0){
+      r.state = globalMode;
+      r.dir = opposite(r.dir);
+    }
+  }
+  advanceOnGrid(r, dt, rindSpeed, function(){
+    var col = Math.round(r.col), row = Math.round(r.row);
+    if (r.state === 'exiting' && col === r.gateOut.col && row === r.gateOut.row){
+      r.state = globalMode;
+    }
+    if (r.state === 'eaten' && col === HOUSE_REST.col && row === HOUSE_REST.row){
+      r.state = 'exiting';
+    }
+    r.dir = chooseRindDir(r);
+  });
+}
+
+function checkCollisions(){
+  for (var i=0;i<rinds.length;i++){
+    var r = rinds[i];
+    var d = dist2({col:player.col, row:player.row}, {col:r.col, row:r.row});
+    if (d < 0.28*0.28*4){
+      if (r.state === 'frightened'){
+        r.state = 'eaten';
+        comboMultiplier++;
+        score += 200 * Math.pow(2, comboMultiplier-1);
+        Audio_.eatRind(comboMultiplier);
+        updateHud();
+      } else if (r.state !== 'eaten' && r.state !== 'inHouse' && r.state !== 'exiting'){
+        killPlayer();
+        return;
+      }
+    }
+  }
+}
+
+function killPlayer(){
+  lives--;
+  updateHud();
+  Audio_.death();
+  state = 'dying';
+  stateTimer = 1.1;
+}
+
+function checkBonus(){
+  if (!bonus.active && dotsRemaining > 0 && dotsRemaining <= Math.floor(totalDots*0.55) && dotsRemaining > Math.floor(totalDots*0.5)){
+    bonus.active = true; bonus.timer = 10;
+  }
+  if (bonus.active){
+    bonus.timer -= 1/60;
+    if (bonus.timer <= 0) bonus.active = false;
+  }
+}
+
+function update(dt){
+  if (state === 'ready'){
+    stateTimer -= dt;
+    if (stateTimer <= 0) state = 'playing';
+    return;
+  }
+  if (state === 'dying'){
+    stateTimer -= dt;
+    if (stateTimer <= 0){
+      if (lives <= 0){ endGame(); }
+      else { resetAfterDeath(); state = 'ready'; stateTimer = 1.0; }
+    }
+    return;
+  }
+  if (state === 'levelclear'){
+    stateTimer -= dt;
+    if (stateTimer <= 0){
+      level++;
+      softResetForLevel(true);
+      state = 'ready'; stateTimer = 1.0;
+      updateHud();
+    }
+    return;
+  }
+  if (state !== 'playing') return;
+
+  elapsedPlaying += dt;
+  updatePlayer(dt);
+  updateGlobalMode(dt);
+  rinds.forEach(function(r){ updateRind(r, dt); });
+  checkCollisions();
+  checkBonus();
+
+  if (dotsRemaining <= 0){
+    state = 'levelclear'; stateTimer = 2.0;
+    Audio_.levelClear();
+  }
+}
+
+function endGame(){
+  state = 'gameover';
+  var isNew = score > best;
+  if (isNew){ best = score; try{ localStorage.setItem('munch-best', String(best)); }catch(e){} }
+  document.getElementById('finalScore').textContent = score;
+  document.getElementById('newBestLine').style.display = isNew ? 'block' : 'none';
+  updateHud();
+  show('gameOverOverlay');
+}
+
+/* =====================================================================
+   RENDER
+   ===================================================================== */
+function cx(col){ return col*TILE + TILE/2; }
+function cy(row){ return row*TILE + TILE/2; }
+
+function drawBackground(){
+  var g = bgCtx;
+  g.clearRect(0,0,COLS*TILE, ROWS*TILE);
+  g.fillStyle = getVar('--bg');
+  g.fillRect(0,0,COLS*TILE, ROWS*TILE);
+  for (var y=0;y<ROWS;y++){
+    for (var x=0;x<COLS;x++){
+      var t = grid[y][x];
+      if (t === '#'){
+        drawWallTile(g, x, y);
+      } else if (t === 'G'){
+        g.save();
+        g.strokeStyle = 'rgba(233,111,145,0.55)';
+        g.lineWidth = 2;
+        g.beginPath();
+        g.moveTo(x*TILE+3, y*TILE+TILE/2);
+        g.lineTo(x*TILE+TILE-3, y*TILE+TILE/2);
+        g.stroke();
+        g.restore();
+      }
+    }
+  }
+}
+function getVar(name){
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+function drawWallTile(g, x, y){
+  var n = tileAt(x,y-1)==='#', s = tileAt(x,y+1)==='#', w = tileAt(x-1,y)==='#', e = tileAt(x+1,y)==='#';
+  var px = x*TILE, py = y*TILE;
+  g.fillStyle = getVar('--wall');
+  var inset = 1.5;
+  g.fillRect(px+inset, py+inset, TILE-inset*2, TILE-inset*2);
+  g.fillStyle = 'rgba(139,123,216,0.20)';
+  if (!n) g.fillRect(px+inset, py+inset, TILE-inset*2, 2);
+  if (!w) g.fillRect(px+inset, py+inset, 2, TILE-inset*2);
+  g.fillStyle = 'rgba(0,0,0,0.18)';
+  if (!s) g.fillRect(px+inset, py+TILE-inset-2, TILE-inset*2, 2);
+  if (!e) g.fillRect(px+TILE-inset-2, py+inset, 2, TILE-inset*2);
+}
+
+function drawDots(t){
+  for (var y=0;y<ROWS;y++){
+    for (var x=0;x<COLS;x++){
+      var c = grid[y][x];
+      if (c === '.'){
+        ctx.fillStyle = getVar('--dot');
+        ctx.beginPath();
+        ctx.arc(cx(x), cy(y), 2.2, 0, Math.PI*2);
+        ctx.fill();
+      } else if (c === 'o'){
+        var pulse = 4.5 + Math.sin(t*6)*1.4;
+        ctx.fillStyle = getVar('--pellet');
+        ctx.save();
+        ctx.shadowColor = getVar('--pellet');
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.arc(cx(x), cy(y), pulse, 0, Math.PI*2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+  }
+  if (bonus.active){
+    ctx.save();
+    ctx.translate(cx(bonus.col), cy(bonus.row));
+    ctx.fillStyle = '#E7B85C';
+    ctx.beginPath();
+    ctx.arc(0,0,6,0,Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    for (var k=0;k<4;k++){
+      ctx.beginPath();
+      ctx.arc(Math.cos(k*1.6)*2.5, Math.sin(k*1.6)*2.5, 0.8, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+function drawPlayer(){
+  var x = cx(player.col), y = cy(player.row);
+  var r = TILE*0.42;
+  var open = 0.28 + Math.abs(Math.sin(player.mouthPhase))*0.28;
+  if (player.dir === DIRS.none) open = 0.06;
+  var ang = 0;
+  if (player.dir.dx===1) ang = 0;
+  else if (player.dir.dx===-1) ang = Math.PI;
+  else if (player.dir.dy===1) ang = Math.PI/2;
+  else if (player.dir.dy===-1) ang = -Math.PI/2;
+
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.rotate(ang);
+  ctx.fillStyle = getVar('--munch');
+  ctx.beginPath();
+  ctx.arc(0,0,r, open*Math.PI, (2-open)*Math.PI);
+  ctx.lineTo(0,0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  // little stem/leaf so Munch reads as a fruit-blob, not a generic disc
+  ctx.save();
+  ctx.translate(x, y-r*0.92);
+  ctx.fillStyle = '#5B8A3B';
+  ctx.beginPath();
+  ctx.ellipse(2,0,4,2,Math.PI/5,0,Math.PI*2);
+  ctx.fill();
+  ctx.fillStyle = getVar('--munch-lo');
+  ctx.fillRect(-1,-1,2,4);
+  ctx.restore();
+}
+
+function drawRind(r){
+  var x = cx(r.col), y = cy(r.row);
+  if (r.state === 'inHouse'){
+    y += Math.sin(frameT*3 + r.startCol) * 2; // purely visual wobble, never affects r.row
+  }
+  var rad = TILE*0.4;
+  if (r.state === 'eaten'){
+    drawEyes(x,y,r.dir,rad);
+    return;
+  }
+  var color = (r.state === 'frightened') ? getVar('--frightened') : r.hex;
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.arc(0,-rad*0.15, rad, Math.PI, 0);
+  ctx.lineTo(rad, rad*0.55);
+  var waves = 4;
+  for (var i=waves;i>=0;i--){
+    var wx = rad - (rad*2/waves)*i;
+    var wy = (i%2===0) ? rad*0.55 : rad*0.85;
+    ctx.lineTo(wx, wy);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  if (r.state === 'frightened'){
+    ctx.save();
+    ctx.translate(x,y-rad*0.1);
+    ctx.strokeStyle = '#5B4B8A';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    for (var m=-rad*0.5; m<rad*0.5; m+=rad*0.25){
+      ctx.lineTo(m, Math.abs(m)%((rad*0.5))<rad*0.25 ? 2 : -2);
+    }
+    ctx.stroke();
+    ctx.restore();
+  } else {
+    drawEyes(x,y-rad*0.1,r.dir,rad);
+  }
+}
+function drawEyes(x,y,dir,rad){
+  var off = rad*0.32;
+  [-1,1].forEach(function(s){
+    ctx.save();
+    ctx.translate(x + s*off, y - rad*0.05);
+    ctx.fillStyle = '#F4E9D8';
+    ctx.beginPath(); ctx.arc(0,0,rad*0.26,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#241A3C';
+    ctx.beginPath(); ctx.arc(dir.dx*rad*0.1, dir.dy*rad*0.1, rad*0.13,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  });
+}
+
+function drawReadyText(){
+  ctx.save();
+  ctx.font = "13px 'Press Start 2P', monospace";
+  ctx.fillStyle = getVar('--munch');
+  ctx.textAlign = 'center';
+  ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 4;
+  ctx.fillText('Ready!', COLS*TILE/2, cy(START.row) - TILE*1.4);
+  ctx.restore();
+}
+
+var frameT = 0;
+function render(dt){
+  frameT += dt;
+  ctx.clearRect(0,0,COLS*TILE, ROWS*TILE);
+  ctx.drawImage(bgCanvas, 0, 0, COLS*TILE, ROWS*TILE);
+  drawDots(frameT);
+  rinds.forEach(drawRind);
+  if (state !== 'dying') drawPlayer();
+  if (state === 'ready') drawReadyText();
+}
+
+/* =====================================================================
+   HUD
+   ===================================================================== */
+function updateHud(){
+  document.getElementById('hudScore').textContent = score;
+  document.getElementById('hudBest').textContent = Math.max(best, score);
+  document.getElementById('hudLevel').textContent = level;
+  var livesEl = document.getElementById('hudLives');
+  livesEl.innerHTML = '';
+  for (var i=0;i<Math.max(lives,0);i++){
+    var d = document.createElement('div');
+    d.className = 'life-dot';
+    livesEl.appendChild(d);
+  }
+}
+function renderMuteIcon(){
+  var muted = Audio_.isMuted();
+  document.getElementById('muteBtn').innerHTML = muted ? iconMuted() : iconSound();
+}
+function iconSound(){
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9v6h4l5 5V4L8 9H4z"/><path d="M16 8a5 5 0 010 8"/></svg>';
+}
+function iconMuted(){
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9v6h4l5 5V4L8 9H4z"/><path d="M17 9l4 6M21 9l-4 6"/></svg>';
+}
+function iconPause(){
+  return '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>';
+}
+document.getElementById('pauseBtn').innerHTML = iconPause();
+renderMuteIcon();
+
+/* =====================================================================
+   MAIN LOOP
+   ===================================================================== */
+resetGrid();
+drawBackground();
+updateHud();
+
+var last = performance.now();
+function loop(now){
+  var dt = Math.min((now - last)/1000, 0.05);
+  last = now;
+  update(dt);
+  render(dt);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+window.addEventListener('resize', function(){ /* CSS handles scaling; canvas stays logical-res */ });
+
+})();
+</script>
+</body>
+</html>
