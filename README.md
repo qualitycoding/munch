@@ -7,14 +7,17 @@ Munch is a one-page maze-chase game — no build step, no dependencies, a
 single `index.html` you can open directly or host anywhere that serves
 static files.
 
-**[Play it live](#)** — add your GitHub Pages URL here once it's deployed,
-e.g. `https://<your-username>.github.io/munch/`.
+**Play it live:** if GitHub Pages is enabled for this repository, it is served at
+`https://qualitycoding.github.io/munch/`.
 
 ## Controls
 
 - **Move:** arrow keys, WASD, or swipe the maze on a touch screen
 - **Pause:** `P` or `Esc`
 - **Mute:** the speaker icon under the maze
+
+Your best score and your mute setting are saved in the browser's `localStorage`. The page loads its two
+fonts from Google Fonts; offline it falls back to system fonts.
 
 ## How it plays
 
